@@ -44,6 +44,8 @@ class ProxyLibintlConan(ConanFile):
     def _configure_meson(self):
         meson = Meson(self)
         defs = dict()
+        if self.settings.os == "Linux":
+            defs["libdir"] = "lib"
         if str(self.settings.compiler) in ["gcc", "clang"]:
             if self.settings.arch == "x86":
                 defs["c_args"] = "-m32"
