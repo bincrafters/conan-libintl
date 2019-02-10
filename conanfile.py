@@ -1,26 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from conans import ConanFile, CMake, tools
+from conans import ConanFile, tools, Meson
 import os
 
 
-class LibnameConan(ConanFile):
-    name = "libname"
-    version = "0.0.0"
-    description = "Keep it short"
-    # topics can get used for searches, GitHub topics, Bintray tags etc. Add here keywords about the library
-    topics = ("conan", "libname", "logging")
-    url = "https://github.com/bincrafters/conan-libname"
-    homepage = "https://github.com/original_author/original_lib"
+class ProxyLibintlConan(ConanFile):
+    name = "proxy-libintl"
+    version = "0.1"
+    description = "This is a trivial minimal library intended to act as a proxy for a dynamically loaded optional libintl"
+    topics = ("conan", "libintl")
+    url = "https://github.com/bincrafters/conan-proxy-libintl"
+    homepage = "https://github.com/frida/proxy-libintl"
     author = "Bincrafters <bincrafters@gmail.com>"
-    license = "MIT"  # Indicates license type of the packaged library; please use SPDX Identifiers https://spdx.org/licenses/
-    exports = ["LICENSE.md"]      # Packages the license for the conanfile.py
-    # Remove following lines if the target lib does not use cmake.
-    exports_sources = ["CMakeLists.txt"]
-    generators = "cmake"
-
-    # Options may need to change depending on the packaged library.
+    license = "GPL-2.0-only"
+    exports = ["LICENSE.md"]
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
@@ -29,46 +23,50 @@ class LibnameConan(ConanFile):
     _source_subfolder = "source_subfolder"
     _build_subfolder = "build_subfolder"
 
-    requires = (
-        "OpenSSL/1.0.2p@conan/stable",
-        "zlib/1.2.11@conan/stable"
-    )
+    def configure(self):
+        del self.settings.compiler.libcxx
 
     def config_options(self):
         if self.settings.os == 'Windows':
             del self.options.fPIC
 
+    def build_requirements(self):
+        if not tools.which("meson"):
+            self.build_requires("meson_installer/0.49.0@bincrafters/stable")
+
     def source(self):
-        source_url = "https://github.com/libauthor/libname"
-        tools.get("{0}/archive/v{1}.tar.gz".format(source_url, self.version), sha256="Please-provide-a-checksum")
-        extracted_dir = self.name + "-" + self.version
+        source_url = "https://github.com/frida/proxy-libintl/archive/%s.tar.gz" % self.version
+        tools.get(source_url,
+                  sha256="202d90855943091b11ac91863ff5884f0eaf80318a32dc8504fcfdafc65992ed")
+        self.run("dir")
+        os.rename(self.name + "-" + self.version, self._source_subfolder)
 
-        # Rename to "source_subfolder" is a convention to simplify later steps
-        os.rename(extracted_dir, self._source_subfolder)
-
-    def _configure_cmake(self):
-        cmake = CMake(self)
-        cmake.definitions["BUILD_TESTS"] = False  # example
-        cmake.configure(build_folder=self._build_subfolder)
-        return cmake
+    def _configure_meson(self):
+        meson = Meson(self)
+        defs = dict()
+        if str(self.settings.compiler) in ["gcc", "clang"]:
+            if self.settings.arch == "x86":
+                defs["c_args"] = "-m32"
+                defs["cpp_args"] = "-m32"
+                defs["c_link_args"] = "-m32"
+                defs["cpp_link_args"] = "-m32"
+            elif self.settings.arch == "x86_64":
+                defs["c_args"] = "-m64"
+                defs["cpp_args"] = "-m64"
+                defs["c_link_args"] = "-m64"
+                defs["cpp_link_args"] = "-m64"
+        meson.configure(source_folder=self._source_subfolder,
+                        build_folder=self._build_subfolder, defs=defs)
+        return meson
 
     def build(self):
-        cmake = self._configure_cmake()
-        cmake.build()
+        meson = self._configure_meson()
+        meson.build()
 
     def package(self):
-        self.copy(pattern="LICENSE", dst="licenses", src=self._source_subfolder)
-        cmake = self._configure_cmake()
-        cmake.install()
-        # If the CMakeLists.txt has a proper install method, the steps below may be redundant
-        # If so, you can just remove the lines below
-        include_folder = os.path.join(self._source_subfolder, "include")
-        self.copy(pattern="*", dst="include", src=include_folder)
-        self.copy(pattern="*.dll", dst="bin", keep_path=False)
-        self.copy(pattern="*.lib", dst="lib", keep_path=False)
-        self.copy(pattern="*.a", dst="lib", keep_path=False)
-        self.copy(pattern="*.so*", dst="lib", keep_path=False)
-        self.copy(pattern="*.dylib", dst="lib", keep_path=False)
+        self.copy(pattern="COPYING", dst="licenses", src=self._source_subfolder)
+        meson = self._configure_meson()
+        meson.install()
 
     def package_info(self):
-        self.cpp_info.libs = tools.collect_libs(self)
+        self.cpp_info.libs = ["intl"]
