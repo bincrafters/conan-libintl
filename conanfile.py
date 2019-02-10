@@ -38,7 +38,6 @@ class ProxyLibintlConan(ConanFile):
         source_url = "https://github.com/frida/proxy-libintl/archive/%s.tar.gz" % self.version
         tools.get(source_url,
                   sha256="202d90855943091b11ac91863ff5884f0eaf80318a32dc8504fcfdafc65992ed")
-        self.run("dir")
         os.rename(self.name + "-" + self.version, self._source_subfolder)
 
     def _configure_meson(self):
